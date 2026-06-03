@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
-  static const String serverUrl = "http://192.168.93.193:8000";
+  static const String serverUrl = "https://linen-deer-529188.hostingersite.com";
   static String get domain => serverUrl;
 
   static String get baseUrl => "$domain/api/v1";
