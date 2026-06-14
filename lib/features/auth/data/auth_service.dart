@@ -97,6 +97,7 @@ class AuthService {
         return {
           'success': false,
           'message': data['message'] ?? 'Login gagal.',
+          'status_code': response.statusCode,
         };
       }
     } catch (e) {
