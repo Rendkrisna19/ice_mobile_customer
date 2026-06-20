@@ -8,6 +8,8 @@ import '../../../../core/components/app_button.dart';
 import '../../data/datasources/order_remote_datasource.dart';
 import 'order_completed_page.dart';
 import 'package:ice_mobile_customer/features/chat/presentation/pages/order_chat_page.dart';
+import '../widgets/live_tracking_map.dart';
+import '../../data/datasources/tracking_datasource.dart';
 
 class OrderDeliveryPage extends StatefulWidget {
   final int orderId;
@@ -27,9 +29,11 @@ class OrderDeliveryPage extends StatefulWidget {
 
 class _OrderDeliveryPageState extends State<OrderDeliveryPage> {
   final OrderRemoteDataSource _orderService = OrderRemoteDataSource();
+  final TrackingDataSource _trackingService = TrackingDataSource();
   
   Timer? _statusTimer;
   Map<String, dynamic>? _orderData; 
+  Map<String, dynamic>? _trackingData;
   bool _isLoading = true;
 
   @override
@@ -54,12 +58,27 @@ class _OrderDeliveryPageState extends State<OrderDeliveryPage> {
           _isLoading = false;
         });
         
-        if (data['status'] == 'completed') {
+        if (data['status'] == 'completed' || data['status'] == 'delivered') {
           _goToCompletedPage();
+        } else if (data['status'] == 'on_delivery') {
+          _fetchTrackingData();
         }
       }
     } catch (e) {
       debugPrint("Gagal load order: $e");
+    }
+  }
+
+  Future<void> _fetchTrackingData() async {
+    try {
+      final tracking = await _trackingService.getTrackingData(widget.orderId);
+      if (mounted) {
+        setState(() {
+          _trackingData = tracking;
+        });
+      }
+    } catch (e) {
+      debugPrint("Gagal load tracking: $e");
     }
   }
 
@@ -174,37 +193,93 @@ class _OrderDeliveryPageState extends State<OrderDeliveryPage> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // --- HEADER GAMBAR ---
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
+                  // --- HEADER GAMBAR / PETA ---
+                  if (_orderData?['status'] == 'on_delivery') ...[
+                    if (_trackingData != null)
+                      LiveTrackingMap(
+                        driverLat: double.tryParse(_trackingData!['driver']?['current_latitude']?.toString() ?? '0') ?? 0.0,
+                        driverLng: double.tryParse(_trackingData!['driver']?['current_longitude']?.toString() ?? '0') ?? 0.0,
+                        customerLat: double.tryParse(_trackingData!['order']?['delivery_latitude']?.toString() ?? '0') ?? 0.0,
+                        customerLng: double.tryParse(_trackingData!['order']?['delivery_longitude']?.toString() ?? '0') ?? 0.0,
+                        outletLat: widget.outletLat,
+                        outletLng: widget.outletLng,
+                        polylineEncoded: _trackingData!['route_polyline'] ?? '',
+                      )
+                    else
+                      Container(
+                        height: 250,
+                        width: double.infinity,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
+                        ),
+                        child: const CircularProgressIndicator(color: AppColors.primary),
+                      ),
+                    
+                    if (_trackingData != null)
+                      Container(
+                        margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.timer_outlined, color: Colors.white, size: 28),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("Estimasi Tiba", style: AppTypography.bodySmall.copyWith(color: Colors.white70)),
+                                  Text("${_trackingData!['eta_minutes'] ?? '-'} Menit", style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text("Jarak", style: AppTypography.bodySmall.copyWith(color: Colors.white70)),
+                                Text("${_trackingData!['distance_remaining_km'] ?? '-'} km", style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      )
+                  ] else ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
+                      ),
+                      child: Column(
+                        children: [
+                          Image.asset(
+                            'assets/images/delivery.png', 
+                            height: 160,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_,__,___) => const Icon(Icons.map, size: 100, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            "Pesanan sedang diproses...",
+                            style: AppTypography.headlineSmall.copyWith(fontSize: 20, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "Kurir akan segera mengambil pesananmu. Mohon tunggu sebentar.",
+                            style: AppTypography.bodyMedium.copyWith(color: Colors.grey[600]),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Column(
-                      children: [
-                        Image.asset(
-                          'assets/images/delivery.png', 
-                          height: 160,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_,__,___) => const Icon(Icons.map, size: 100, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          "Pesanan sedang diantar...",
-                          style: AppTypography.headlineSmall.copyWith(fontSize: 20, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Kurir sedang menuju ke lokasimu. Mohon pastikan nomor HP aktif.",
-                          style: AppTypography.bodyMedium.copyWith(color: Colors.grey[600]),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
                   const SizedBox(height: 20),
 
                   // --- KARTU DRIVER ---
