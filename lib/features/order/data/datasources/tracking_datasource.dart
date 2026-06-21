@@ -26,7 +26,7 @@ class TrackingDataSource {
 
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
-        if (decoded['status'] == true) {
+        if (decoded['status'] == 'success' || decoded['status'] == true) {
           return decoded['data'];
         } else {
           throw Exception(decoded['message'] ?? 'Failed to get tracking data');

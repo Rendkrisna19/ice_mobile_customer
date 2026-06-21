@@ -70,21 +70,11 @@ class _LiveTrackingMapState extends State<LiveTrackingMap> {
     final routePoints = _decodePolyline(widget.polylineEncoded);
 
     return Container(
-      height: 250,
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.grey[200],
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
       ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-        child: FlutterMap(
+      child: FlutterMap(
           mapController: _mapController,
           options: MapOptions(
             initialCenter: driverPos,
@@ -100,8 +90,10 @@ class _LiveTrackingMapState extends State<LiveTrackingMap> {
                 polylines: [
                   Polyline(
                     points: routePoints,
-                    strokeWidth: 5.0,
-                    color: AppColors.primary.withOpacity(0.7),
+                    strokeWidth: 8.0,
+                    color: const Color(0xFF10B981).withOpacity(0.9), // Hijau Gojek
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
                   ),
                 ],
               ),
@@ -143,8 +135,9 @@ class _LiveTrackingMapState extends State<LiveTrackingMap> {
                     height: 48,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: const Color(0xFF1A534B), // Hijau Gelap
                         shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.2),
@@ -153,14 +146,13 @@ class _LiveTrackingMapState extends State<LiveTrackingMap> {
                           )
                         ],
                       ),
-                      child: const Icon(Icons.motorcycle, color: AppColors.primary, size: 28),
+                      child: const Icon(Icons.two_wheeler, color: Colors.white, size: 28),
                     ),
                   ),
               ],
             ),
           ],
         ),
-      ),
     );
   }
 }

@@ -139,311 +139,330 @@ class _OrderDeliveryPageState extends State<OrderDeliveryPage> {
        tax = subTotal * 0.10;
     }
 
+    final isOnDelivery = _orderData?['status'] == 'on_delivery';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
+      extendBodyBehindAppBar: isOnDelivery, // Agar peta masuk ke bawah appbar transparan
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
+        backgroundColor: isOnDelivery ? Colors.transparent : AppColors.primary,
         elevation: 0,
         centerTitle: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context), 
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isOnDelivery ? Colors.white : Colors.transparent,
+            shape: BoxShape.circle,
+            boxShadow: isOnDelivery ? [BoxShadow(color: Colors.black12, blurRadius: 4)] : null,
+          ),
+          child: IconButton(
+            icon: Icon(Icons.arrow_back, color: isOnDelivery ? Colors.black87 : Colors.white),
+            onPressed: () => Navigator.pop(context), 
+          ),
         ),
-        title: Text(
+        title: isOnDelivery ? null : Text(
           "Status Pesanan",
           style: AppTypography.headlineSmall.copyWith(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        actions: [
-          if (driver != null && driver['phone'] != null)
-            IconButton(
-              icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-              onPressed: () {
-                                if (_orderData != null && driver != null) {
-                                  final transactionId = _orderData!['id'] ?? 0;
-                                  final senderId = _orderData!['user_id'] ?? 0;
-                                  final receiverId = _orderData!['driver_id'] ?? 0;
-                                  if (transactionId == 0 || senderId == 0 || receiverId == 0) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("Data chat tidak lengkap")),
-                                    );
-                                    return;
-                                  }
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => OrderChatPage(
-                                        transactionId: transactionId,
-                                        senderId: senderId,
-                                        receiverId: receiverId,
-                                        sentBy: 'customer',
-                                      ),
-                                    ),
-                                  );
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Data order/driver tidak tersedia")));
-                                }
-                            },
-            ),
-          const SizedBox(width: 8),
-        ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // --- HEADER GAMBAR / PETA ---
-                  if (_orderData?['status'] == 'on_delivery') ...[
-                    if (_trackingData != null)
-                      LiveTrackingMap(
-                        driverLat: double.tryParse(_trackingData!['driver']?['current_latitude']?.toString() ?? '0') ?? 0.0,
-                        driverLng: double.tryParse(_trackingData!['driver']?['current_longitude']?.toString() ?? '0') ?? 0.0,
-                        customerLat: double.tryParse(_trackingData!['order']?['delivery_latitude']?.toString() ?? '0') ?? 0.0,
-                        customerLng: double.tryParse(_trackingData!['order']?['delivery_longitude']?.toString() ?? '0') ?? 0.0,
-                        outletLat: widget.outletLat,
-                        outletLng: widget.outletLng,
-                        polylineEncoded: _trackingData!['route_polyline'] ?? '',
-                      )
-                    else
-                      Container(
-                        height: 250,
-                        width: double.infinity,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
+      body: isOnDelivery ? _buildFullScreenMap(driver) : _buildStandardView(driver, items, subTotal, tax, deliveryFee, totalPrice),
+    );
+  }
+
+  Widget _buildFullScreenMap(dynamic driver) {
+    return Stack(
+      children: [
+        // 1. FULLSCREEN MAP
+        Positioned.fill(
+          child: _trackingData != null 
+            ? LiveTrackingMap(
+                driverLat: double.tryParse(_trackingData!['driver']?['current_latitude']?.toString() ?? '0') ?? 0.0,
+                driverLng: double.tryParse(_trackingData!['driver']?['current_longitude']?.toString() ?? '0') ?? 0.0,
+                customerLat: double.tryParse(_trackingData!['destination']?['latitude']?.toString() ?? '0') ?? 0.0,
+                customerLng: double.tryParse(_trackingData!['destination']?['longitude']?.toString() ?? '0') ?? 0.0,
+                outletLat: widget.outletLat,
+                outletLng: widget.outletLng,
+                polylineEncoded: _trackingData!['route_polyline'] ?? '',
+              )
+            : const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        ),
+
+        // 2. FLOATING INFO CARD (ETA) DI ATAS
+        if (_trackingData != null)
+        Positioned(
+          top: 100, left: 20, right: 20,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10))],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Estimasi Tiba", style: AppTypography.bodySmall.copyWith(color: Colors.grey[600], fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text("${_trackingData!['eta_minutes'] ?? '-'} Min", style: AppTypography.headlineSmall.copyWith(fontSize: 24, fontWeight: FontWeight.black, color: AppColors.primary)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+                          child: Text("${_trackingData!['distance_remaining_km'] ?? '-'} km", style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[800])),
                         ),
-                        child: const CircularProgressIndicator(color: AppColors.primary),
-                      ),
-                    
-                    if (_trackingData != null)
-                      Container(
-                        margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.timer_outlined, color: Colors.white, size: 28),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text("Estimasi Tiba", style: AppTypography.bodySmall.copyWith(color: Colors.white70)),
-                                  Text("${_trackingData!['eta_minutes'] ?? '-'} Menit", style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text("Jarak", style: AppTypography.bodySmall.copyWith(color: Colors.white70)),
-                                Text("${_trackingData!['distance_remaining_km'] ?? '-'} km", style: AppTypography.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      )
-                  ] else ...[
+                      ],
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: const Color(0xFFE8F5E9), shape: BoxShape.circle),
+                  child: const Icon(Icons.delivery_dining, color: AppColors.primary, size: 28),
+                )
+              ],
+            ),
+          ),
+        ),
+
+        // 3. BOTTOM SHEET DRIVER (GOJEK STYLE)
+        Positioned(
+          bottom: 0, left: 0, right: 0,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, -5))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // DRIVER INFO
+                if (driver != null)
+                Row(
+                  children: [
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
+                      width: 60, height: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3),
+                        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
                       ),
+                      child: ClipOval(
+                        child: driver['photo'] != null 
+                          ? Image.network(driver['photo'], fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.person, color: Colors.grey, size: 30))
+                          : const Icon(Icons.person, color: Colors.grey, size: 30),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Image.asset(
-                            'assets/images/delivery.png', 
-                            height: 160,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_,__,___) => const Icon(Icons.map, size: 100, color: Colors.grey),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            "Pesanan sedang diproses...",
-                            style: AppTypography.headlineSmall.copyWith(fontSize: 20, fontWeight: FontWeight.bold),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            "Kurir akan segera mengambil pesananmu. Mohon tunggu sebentar.",
-                            style: AppTypography.bodyMedium.copyWith(color: Colors.grey[600]),
-                            textAlign: TextAlign.center,
+                          Text(driver['name'] ?? "Driver", style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.star, color: Colors.amber, size: 16),
+                              const SizedBox(width: 4),
+                              Text("4.9", style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.bold)),
+                              const SizedBox(width: 8),
+                              Container(width: 4, height: 4, decoration: const BoxDecoration(color: Colors.grey, shape: BoxShape.circle)),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text("${driver['vehicle_type'] ?? 'Motor'} • ${driver['plate_number'] ?? '-'}", style: AppTypography.bodySmall.copyWith(color: Colors.grey[600]), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                            ],
                           ),
                         ],
                       ),
                     ),
                   ],
-                  const SizedBox(height: 20),
+                ),
+                
+                const SizedBox(height: 24),
 
-                  // --- KARTU DRIVER ---
-                  if (driver != null) 
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-                    ),
-                    child: Row(
-                      children: [
-                        ClipOval(
-                          child: Container(
-                            width: 50, height: 50,
-                            color: Colors.grey[200],
-                            child: const Icon(Icons.person, color: Colors.grey, size: 30),
-                          ),
+                // ACTION BUTTONS
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                           if (driver != null && driver['phone'] != null) {
+                             _launchWhatsApp(driver['phone']);
+                           }
+                        },
+                        icon: const Icon(Icons.phone, size: 20),
+                        label: const Text("Telepon"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary, width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(driver['name'] ?? "Driver", style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              Text("${driver['vehicle_type'] ?? 'Motor'} | ${driver['plate_number'] ?? '-'}", style: AppTypography.bodySmall.copyWith(color: Colors.grey[600]), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            ],
-                          ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                           if (_orderData != null && driver != null) {
+                              final transactionId = _orderData!['id'] ?? 0;
+                              final senderId = _orderData!['user_id'] ?? 0;
+                              final receiverId = _orderData!['driver_id'] ?? 0;
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => OrderChatPage(transactionId: transactionId, senderId: senderId, receiverId: receiverId, sentBy: 'customer')));
+                           }
+                        },
+                        icon: const Icon(Icons.chat, size: 20),
+                        label: const Text("Chat"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        Container(
-                          width: 40, height: 40,
-                          decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(10)),
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20),
-                            onPressed: () {
-                              if (_orderData != null && driver != null) {
-                                final transactionId = _orderData!['id'] ?? 0;
-                                final senderId = _orderData!['user_id'] ?? 0;
-                                final receiverId = _orderData!['driver_id'] ?? 0;
-                                if (transactionId == 0 || senderId == 0 || receiverId == 0) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Data chat tidak lengkap")),
-                                  );
-                                  return;
-                                }
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => OrderChatPage(
-                                      transactionId: transactionId,
-                                      senderId: senderId,
-                                      receiverId: receiverId,
-                                      sentBy: 'customer',
-                                    ),
-                                  ),
-                                );
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Data order/driver tidak tersedia")));
-                              }
-                            },
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  )
-                  else
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                    child: const Row(
-                      children: [
-                        CircularProgressIndicator(strokeWidth: 2),
-                        SizedBox(width: 16),
-                        Text("Sedang mencari driver..."),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // --- METODE PEMBAYARAN ---
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.wallet, color: AppColors.primary, size: 24),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text("Metode Pembayaran", style: AppTypography.bodySmall.copyWith(color: Colors.grey)),
-                            const SizedBox(height: 4),
-                            Text("Tunai (Cash)", style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold, fontSize: 14)),
-                          ],
-                        )
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // --- DETAIL PESANAN & RINGKASAN DARI BACKEND ---
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Loop Item
-                        ...items.map((item) {
-                          final productName = item['product_name_snap'] ?? (item['product'] != null ? item['product']['name'] : "Item");
-                          double price = double.tryParse(item['price']?.toString() ?? item['product_price_snap']?.toString() ?? '0') ?? 0.0;
-                          final qty = item['quantity'] ?? 0;
-                          
-                          return Column(
-                            children: [
-                              _buildOrderItem(productName, _formatCurrency(price), "${qty}x"),
-                              const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(thickness: 0.5)),
-                            ],
-                          );
-                        }),
-                        const SizedBox(height: 8),
-
-                        // Ringkasan
-                        Text("Ringkasan Pembayaran", style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 12),
-
-                        _buildSummaryRow("Harga", _formatCurrency(subTotal)),
-                        const SizedBox(height: 8),
-                        _buildSummaryRow("Pajak (10%)", _formatCurrency(tax)),
-                        const SizedBox(height: 8),
-                        _buildSummaryRow("Biaya Pengiriman", _formatCurrency(deliveryFee)),
-                        const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(thickness: 1)),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text("Total Pembayaran", style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
-                            Text(_formatCurrency(totalPrice), style: AppTypography.headlineSmall.copyWith(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStandardView(dynamic driver, List<dynamic> items, double subTotal, double tax, double deliveryFee, double totalPrice) {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                // --- HEADER GAMBAR ---
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
+                  ),
+                  child: Column(
+                    children: [
+                      Image.asset(
+                        'assets/images/delivery.png', 
+                        height: 160,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_,__,___) => const Icon(Icons.map, size: 100, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        "Pesanan sedang diproses...",
+                        style: AppTypography.headlineSmall.copyWith(fontSize: 20, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Kurir akan segera mengambil pesananmu. Mohon tunggu sebentar.",
+                        style: AppTypography.bodyMedium.copyWith(color: Colors.grey[600]),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // --- KARTU DRIVER ---
+                if (driver != null) 
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  child: Row(
+                    children: [
+                      ClipOval(
+                        child: Container(
+                          width: 50, height: 50,
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.person, color: Colors.grey, size: 30),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(driver['name'] ?? "Driver", style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text("${driver['vehicle_type'] ?? 'Motor'} | ${driver['plate_number'] ?? '-'}", style: AppTypography.bodySmall.copyWith(color: Colors.grey[600]), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // --- DETAIL PESANAN ---
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ...items.map((item) {
+                        final productName = item['product_name_snap'] ?? (item['product'] != null ? item['product']['name'] : "Item");
+                        double price = double.tryParse(item['price']?.toString() ?? item['product_price_snap']?.toString() ?? '0') ?? 0.0;
+                        final qty = item['quantity'] ?? 0;
+                        
+                        return Column(
+                          children: [
+                            _buildOrderItem(productName, _formatCurrency(price), "${qty}x"),
+                            const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(thickness: 0.5)),
+                          ],
+                        );
+                      }),
+                      const SizedBox(height: 8),
+
+                      Text("Ringkasan Pembayaran", style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      _buildSummaryRow("Harga", _formatCurrency(subTotal)),
+                      const SizedBox(height: 8),
+                      _buildSummaryRow("Pajak (10%)", _formatCurrency(tax)),
+                      const SizedBox(height: 8),
+                      _buildSummaryRow("Biaya Pengiriman", _formatCurrency(deliveryFee)),
+                      const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(thickness: 1)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Total Pembayaran", style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+                          Text(_formatCurrency(totalPrice), style: AppTypography.headlineSmall.copyWith(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
