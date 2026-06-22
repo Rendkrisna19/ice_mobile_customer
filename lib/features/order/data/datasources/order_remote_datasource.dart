@@ -40,13 +40,14 @@ class OrderRemoteDataSource {
   // ===========================================================================
   // 2. FUNGSI CREATE ORDER
   // ===========================================================================
-  Future<int> createOrder({
+  Future<Map<String, dynamic>> createOrder({
     required int outletId,
     required List<Map<String, dynamic>> items,
     required String address,
     required double lat,
     required double lng,
     required double distanceReal, 
+    String paymentMethod = 'cod',
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token'); 
@@ -58,41 +59,68 @@ class OrderRemoteDataSource {
     final formattedItems = items.map((item) {
       return {
         "product_id": item['id'], 
-        "quantity": item['qty'],  
-        "notes": item['note'] ?? "", 
+        "quantity": item['qty'],
+        "variant_snap": item['note'] != null && item['note'].isNotEmpty 
+            ? {"notes": item['note']} 
+            : null,
       };
     }).toList();
 
-    final body = {
+    final payload = {
       "outlet_id": outletId,
-      "items": formattedItems,
       "delivery_address": address,
       "delivery_latitude": lat,
       "delivery_longitude": lng,
-      "distance_real": distanceReal, 
+      "distance_real": distanceReal,
+      "payment_method": paymentMethod,
+      "items": formattedItems,
     };
 
+    final String url = '${ApiConfig.baseUrl}/customer/orders';
+
     final response = await http.post(
-      Uri.parse(ApiConfig.customerOrders),
+      Uri.parse(url),
       headers: {
-        'Authorization': 'Bearer $token', 
         'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
         'Accept': 'application/json',
-        'ngrok-skip-browser-warning': 'true', 
       },
-      body: jsonEncode(body),
+      body: json.encode(payload),
     );
 
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['data']['id']; 
+    if (response.statusCode == 201) {
+      final jsonResponse = json.decode(response.body);
+      return jsonResponse['data']; // Mengembalikan objek order utuh
     } else {
-      throw Exception('Gagal membuat pesanan: ${response.body}');
+      final errorJson = json.decode(response.body);
+      throw Exception(errorJson['message'] ?? 'Gagal membuat pesanan');
     }
   }
 
   // ===========================================================================
-  // 3. FUNGSI GET DETAIL ORDER
+  // 3. FUNGSI SIMULATE PAYMENT (UNTUK SANDBOX TESTING)
+  // ===========================================================================
+  Future<void> simulatePayment(int orderId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    final String url = '${ApiConfig.baseUrl}/customer/orders/$orderId/simulate-payment';
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Gagal mensimulasikan pembayaran');
+    }
+  }
+
+  // ===========================================================================
+  // 4. FUNGSI GET DETAIL ORDER
   // ===========================================================================
   Future<Map<String, dynamic>> getOrderDetail(int orderId) async {
     final prefs = await SharedPreferences.getInstance();

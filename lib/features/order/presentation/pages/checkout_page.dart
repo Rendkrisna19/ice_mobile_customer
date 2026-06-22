@@ -45,6 +45,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
   bool _isLoading = false;
   bool _isLoadingConfig = true;
 
+  String _paymentMethod = 'cod'; // Default: COD
+
   @override
   void initState() {
     super.initState();
@@ -180,16 +182,69 @@ class _CheckoutPageState extends State<CheckoutPage> {
     setState(() => _isLoading = true);
 
     try {
-      final int newOrderId = await _orderService.createOrder(
+      final orderResponse = await _orderService.createOrder(
         outletId: widget.outletId,
         items: _cartItems,
         address: _deliveryAddress,
         lat: _userLat,
         lng: _userLng,
         distanceReal: _distanceKm,
+        paymentMethod: _paymentMethod,
       );
 
-      if (mounted) {
+      final int newOrderId = orderResponse['id'];
+
+      if (!mounted) return;
+
+      if (_paymentMethod == 'online') {
+        // Tampilkan dialog simulasi Midtrans Sandbox
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Simulasi Payment Gateway (Sandbox)"),
+            content: Text("Berhasil mendapatkan Snap Token: \n\n${orderResponse['snap_token']}\n\nKlik 'Bayar Lunas' untuk mensimulasikan pembayaran berhasil dari Midtrans."),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  setState(() => _isLoading = false);
+                },
+                child: const Text("Batal"),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  setState(() => _isLoading = true);
+                  try {
+                    await _orderService.simulatePayment(newOrderId);
+                    if (mounted) {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CheckoutWaitingPage(
+                            orderId: newOrderId,
+                            totalBill: _grandTotal.toDouble(),
+                          ),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Gagal simulasi: $e")),
+                      );
+                    }
+                    setState(() => _isLoading = false);
+                  }
+                },
+                child: const Text("Bayar Lunas"),
+              )
+            ],
+          ),
+        );
+      } else {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -208,8 +263,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               backgroundColor: AppColors.error),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
     }
   }
 
@@ -420,26 +474,72 @@ class _CheckoutPageState extends State<CheckoutPage> {
                             offset: const Offset(0, 4))
                       ],
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.wallet,
-                            color: AppColors.primary, size: 24),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("Metode Pembayaran",
-                                  style: AppTypography.bodySmall
-                                      .copyWith(color: AppColors.neutral)),
-                              const SizedBox(height: 4),
-                              Text(
-                                "Tunai (Cash)",
-                                style: AppTypography.titleMedium.copyWith(
-                                    fontWeight: FontWeight.bold, fontSize: 14),
+                        Row(
+                          children: [
+                            const Icon(Icons.wallet,
+                                color: AppColors.primary, size: 24),
+                            const SizedBox(width: 12),
+                            Text("Metode Pembayaran",
+                                style: AppTypography.bodySmall
+                                    .copyWith(color: AppColors.neutral)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _paymentMethod = 'cod'),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: _paymentMethod == 'cod' ? AppColors.primary.withOpacity(0.1) : Colors.white,
+                                    border: Border.all(
+                                      color: _paymentMethod == 'cod' ? AppColors.primary : AppColors.neutral.withOpacity(0.2),
+                                      width: 2,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text("Tunai (COD)", 
+                                    style: AppTypography.titleMedium.copyWith(
+                                      color: _paymentMethod == 'cod' ? AppColors.primary : AppColors.neutral,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    )
+                                  ),
+                                ),
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _paymentMethod = 'online'),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: _paymentMethod == 'online' ? AppColors.primary.withOpacity(0.1) : Colors.white,
+                                    border: Border.all(
+                                      color: _paymentMethod == 'online' ? AppColors.primary : AppColors.neutral.withOpacity(0.2),
+                                      width: 2,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text("Transfer / E-Wallet", 
+                                    style: AppTypography.titleMedium.copyWith(
+                                      color: _paymentMethod == 'online' ? AppColors.primary : AppColors.neutral,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    )
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
