@@ -85,6 +85,51 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     });
   }
 
+  Future<void> _simulateSandboxPayment() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text("Simulasi Payment Gateway"),
+          content: const Text("Memproses pembayaran... (Sandbox)"),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                setState(() => _isLoading = true);
+                try {
+                  await _orderService.simulatePayment(widget.orderId);
+                  await _fetchOrderDetail(); // Refresh data
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Pembayaran Berhasil Disimulasikan!"), backgroundColor: Colors.green),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Gagal simulasi: $e"), backgroundColor: Colors.red),
+                    );
+                  }
+                } finally {
+                  if (mounted) setState(() => _isLoading = false);
+                }
+              },
+              child: const Text("Bayar Lunas"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Batal", style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      debugPrint("Gagal simulate: $e");
+    }
+  }
+
   // Helper Format Rupiah
   String _formatCurrency(num value) {
     return "Rp. ${value.ceil().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}";
@@ -238,27 +283,68 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                     width: double.infinity,
                     color: Colors.white,
                     padding: const EdgeInsets.all(20),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.wallet, color: AppColors.primary, size: 28),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Row(
                             children: [
-                              Text("Metode Pembayaran", style: AppTypography.bodySmall.copyWith(color: Colors.grey)),
-                              const SizedBox(height: 4),
-                              Text("Tunai (Cash)", style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+                              const Icon(Icons.wallet, color: AppColors.primary, size: 28),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text("Metode Pembayaran", style: AppTypography.bodySmall.copyWith(color: Colors.grey)),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _orderData!['payment_method'] == 'online' ? "Transfer / E-Wallet" : "Tunai (Cash)", 
+                                      style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold)
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _orderData!['payment_status'] == 'paid' ? Colors.green.shade50 : Colors.orange.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  _orderData!['payment_status'] == 'paid' ? "LUNAS" : "BELUM BAYAR",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: _orderData!['payment_status'] == 'paid' ? Colors.green : Colors.orange,
+                                  ),
+                                ),
+                              )
                             ],
+                          ),
+                        ),
+                        
+                        // TOMBOL SIMULASI PEMBAYARAN JIKA ONLINE & UNPAID
+                        if (_orderData!['payment_method'] == 'online' && _orderData!['payment_status'] != 'paid') ...[
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () => _simulateSandboxPayment(),
+                              child: const Text("Simulasi Pembayaran (Sandbox)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
                           )
-                        ],
-                      ),
+                        ]
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),

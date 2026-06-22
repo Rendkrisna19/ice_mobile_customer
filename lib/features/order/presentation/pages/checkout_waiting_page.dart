@@ -31,6 +31,7 @@ class _CheckoutWaitingPageState extends State<CheckoutWaitingPage> with SingleTi
   
   // [TAMBAHAN] State untuk menyimpan harga mutlak dari backend
   late double _displayTotal;
+  Map<String, dynamic>? _orderData;
 
   @override
   void initState() {
@@ -64,6 +65,7 @@ class _CheckoutWaitingPageState extends State<CheckoutWaitingPage> with SingleTi
 
         if (mounted) {
           setState(() {
+            _orderData = orderData;
             // [SINKRONISASI HARGA] Timpa harga tampilan dengan harga asli dari database Laravel!
             _displayTotal = double.tryParse(orderData['total_price']?.toString() ?? '0') ?? _displayTotal;
           });
@@ -269,7 +271,7 @@ class _CheckoutWaitingPageState extends State<CheckoutWaitingPage> with SingleTi
                         const Icon(Icons.wallet, color: AppColors.primary, size: 24),
                         const SizedBox(width: 12),
                         Text(
-                          "Tunai (Cash)", 
+                          _orderData != null && _orderData!['payment_method'] == 'online' ? "Transfer / E-Wallet" : "Tunai (Cash)", 
                           style: AppTypography.titleMedium.copyWith(fontSize: 14, fontWeight: FontWeight.bold)
                         ),
                       ],
