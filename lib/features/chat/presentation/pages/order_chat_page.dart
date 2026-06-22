@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ice_mobile_customer/core/style/app_colors.dart';
 import 'package:ice_mobile_customer/core/style/app_typography.dart';
@@ -43,6 +44,7 @@ class _OrderChatPageState extends State<OrderChatPage> {
 
   String? _apiDriverName;
   String? _apiDriverPlate;
+  String? _apiDriverPhone;
 
   Timer? _pollingTimer;
 
@@ -97,6 +99,7 @@ class _OrderChatPageState extends State<OrderChatPage> {
         if (responseData['order_info'] != null) {
           _apiDriverName = responseData['order_info']['driver_name'];
           _apiDriverPlate = responseData['order_info']['driver_plate_number'];
+          _apiDriverPhone = responseData['order_info']['driver_phone'];
         }
         _messages = newMessages;
         _isLoading = false;
@@ -187,6 +190,21 @@ class _OrderChatPageState extends State<OrderChatPage> {
     return null;
   }
 
+  Future<void> _launchWhatsApp(String phone, String name) async {
+    String formattedPhone = phone;
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = "62${formattedPhone.substring(1)}";
+    }
+    
+    String message = "Halo Pak $name, saya ingin konfirmasi untuk pesanan Order #${widget.transactionId}.";
+    final Uri url = Uri.parse("https://wa.me/$formattedPhone?text=${Uri.encodeComponent(message)}");
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Gagal membuka WhatsApp")));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final driverName = _headerDriverName;
@@ -203,6 +221,14 @@ class _OrderChatPageState extends State<OrderChatPage> {
               .copyWith(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          if (_apiDriverPhone != null && _apiDriverPhone!.isNotEmpty)
+            IconButton(
+              onPressed: () => _launchWhatsApp(_apiDriverPhone!, driverName ?? 'Driver'),
+              icon: Image.asset('assets/icons/whatsapp.png', width: 24, height: 24, color: Colors.white, errorBuilder: (_,__,___) => const Icon(Icons.wechat, color: Colors.white, size: 24)),
+              tooltip: 'Chat WA Driver',
+            ),
+        ],
       ),
       body: Column(
         children: [

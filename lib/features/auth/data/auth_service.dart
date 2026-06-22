@@ -47,7 +47,7 @@ class AuthService {
     );
     final data = jsonDecode(response.body);
     final isSuccess = (data['success'] == true) || (data['status'] == 'success');
-    if (response.statusCode == 200 && isSuccess) {
+    if ((response.statusCode == 200 || response.statusCode == 201) && isSuccess) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('token', data['data']['token']);
       await prefs.setString('user_data', jsonEncode(data['data']['user']));
@@ -151,6 +151,59 @@ class AuthService {
           };
         }
       }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Terjadi kesalahan koneksi: $e',
+      };
+    }
+  }
+
+  // ===========================================================================
+  // FUNGSI LUPA PASSWORD
+  // ===========================================================================
+  Future<Map<String, dynamic>> requestForgotPasswordOtp(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/auth/forgot-password/request'),
+        headers: _headers,
+        body: jsonEncode({'email': email}),
+      );
+      final data = jsonDecode(response.body);
+      return {
+        'success': response.statusCode == 200 && data['status'] == 'success',
+        'message': data['message'],
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Terjadi kesalahan koneksi: $e',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyForgotPasswordOtp({
+    required String email,
+    required String otp,
+    required String password,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/auth/forgot-password/verify'),
+        headers: _headers,
+        body: jsonEncode({
+          'email': email,
+          'otp': otp,
+          'password': password,
+          'password_confirmation': password,
+        }),
+      );
+      final data = jsonDecode(response.body);
+      final isSuccess = (data['success'] == true) || (data['status'] == 'success');
+      return {
+        'success': response.statusCode == 200 && isSuccess,
+        'message': data['message'] ?? (isSuccess ? 'Berhasil' : 'Gagal'),
+      };
     } catch (e) {
       return {
         'success': false,

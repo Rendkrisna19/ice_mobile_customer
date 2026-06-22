@@ -101,13 +101,17 @@ class _OrderDeliveryPageState extends State<OrderDeliveryPage> {
     return "Rp. ${value.ceil().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}";
   }
 
-  // --- LOGIC BUKA WHATSAPP ---
-  Future<void> _launchWhatsApp(String phone) async {
+  // --- LOGIC BUKA WHATSAPP DRIVER ---
+  Future<void> _launchWhatsApp(String phone, String driverName) async {
     String formattedPhone = phone;
     if (formattedPhone.startsWith('0')) {
       formattedPhone = "62${formattedPhone.substring(1)}";
     }
-    final Uri url = Uri.parse("https://wa.me/$formattedPhone");
+    
+    String custName = _orderData?['customer']?['name'] ?? 'Customer';
+    String message = "Halo Pak $driverName, saya $custName dengan pesanan Nomor Order #${widget.orderId}. Posisi sudah di mana ya pak?";
+    
+    final Uri url = Uri.parse("https://wa.me/$formattedPhone?text=${Uri.encodeComponent(message)}");
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Gagal membuka WhatsApp")));
@@ -293,11 +297,11 @@ class _OrderDeliveryPageState extends State<OrderDeliveryPage> {
                       child: OutlinedButton.icon(
                         onPressed: () {
                            if (driver != null && driver['phone'] != null) {
-                             _launchWhatsApp(driver['phone']);
+                             _launchWhatsApp(driver['phone'], driver['name'] ?? 'Driver');
                            }
                         },
-                        icon: const Icon(Icons.phone, size: 20),
-                        label: const Text("Telepon"),
+                        icon: const Icon(Icons.wechat, size: 20),
+                        label: const Text("WhatsApp"),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           side: const BorderSide(color: AppColors.primary, width: 1.5),

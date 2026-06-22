@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart'; // Tambahkan url_launcher
 // Hapus import geolocator karena kita tidak menghitung manual lagi
 import '../../../../core/style/app_colors.dart';
 import '../../../../core/style/app_typography.dart';
@@ -135,6 +136,36 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     return "Rp. ${value.ceil().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}";
   }
 
+  // --- LOGIC BUKA WHATSAPP OUTLET ---
+  Future<void> _launchWhatsAppOutlet() async {
+    if (_orderData == null) return;
+    final outlet = _orderData!['outlet'];
+    final customer = _orderData!['customer'];
+    if (outlet == null) return;
+
+    // Ambil nomor WA outlet atau phone biasa
+    String phone = outlet['whatsapp_number'] ?? outlet['phone'] ?? '';
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Nomor kontak outlet tidak tersedia")));
+      return;
+    }
+
+    String formattedPhone = phone;
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = "62${formattedPhone.substring(1)}";
+    }
+    
+    String custName = customer?['name'] ?? 'Customer';
+    String message = "Halo Outlet, saya $custName.\nSaya ingin konfirmasi mengenai pesanan saya dengan Nomor Order #${widget.orderId}.";
+    
+    final Uri url = Uri.parse("https://wa.me/$formattedPhone?text=${Uri.encodeComponent(message)}");
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Gagal membuka WhatsApp")));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading || _orderData == null) {
@@ -196,6 +227,11 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
           style: AppTypography.headlineSmall.copyWith(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            onPressed: _launchWhatsAppOutlet,
+            icon: Image.asset('assets/icons/whatsapp.png', width: 24, height: 24, color: Colors.white, errorBuilder: (_,__,___) => const Icon(Icons.wechat, color: Colors.white, size: 24)),
+            tooltip: 'Chat WA Outlet',
+          ),
           IconButton(
             onPressed: () {
               if (_orderData == null) return;

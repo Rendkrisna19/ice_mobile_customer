@@ -9,6 +9,7 @@ import '../../../../core/components/app_button.dart';
 import '../../../../core/components/app_text_field.dart';
 import '../../../home/presentation/pages/home_page.dart';
 import 'register_page.dart';
+import 'forgot_password_page.dart';
 
 // Import Service
 import '../../data/auth_service.dart'; 
@@ -311,7 +312,23 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
 
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
+                              );
+                            },
+                            child: Text(
+                              "Lupa Kata Sandi?",
+                              style: AppTypography.labelLarge.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
 
                         // TOMBOL MASUK
                         SizedBox(
