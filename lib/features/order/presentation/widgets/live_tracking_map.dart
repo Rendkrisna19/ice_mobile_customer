@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -33,33 +34,21 @@ class _LiveTrackingMapState extends State<LiveTrackingMap> {
   List<LatLng> _decodePolyline(String encoded) {
     if (encoded.isEmpty) return [];
     
-    List<LatLng> points = [];
-    int index = 0, len = encoded.length;
-    int lat = 0, lng = 0;
-
-    while (index < len) {
-      int b, shift = 0, result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      points.add(LatLng((lat / 1E5).toDouble(), (lng / 1E5).toDouble()));
+    try {
+      List<dynamic> jsonList = jsonDecode(encoded);
+      return jsonList.map((point) {
+        if (point is List && point.length >= 2) {
+          return LatLng(
+            double.tryParse(point[0].toString()) ?? 0.0,
+            double.tryParse(point[1].toString()) ?? 0.0,
+          );
+        }
+        return const LatLng(0, 0);
+      }).where((latLng) => latLng.latitude != 0 && latLng.longitude != 0).toList();
+    } catch (e) {
+      debugPrint("Error decoding polyline JSON: \$e");
+      return [];
     }
-    return points;
   }
 
   @override

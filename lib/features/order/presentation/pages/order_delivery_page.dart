@@ -208,7 +208,7 @@ class _OrderDeliveryPageState extends State<OrderDeliveryPage> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Text("${_trackingData!['eta_minutes'] ?? '-'} Min", style: AppTypography.headlineSmall.copyWith(fontSize: 24, fontWeight: FontWeight.black, color: AppColors.primary)),
+                        Text("${_trackingData!['eta_minutes'] ?? '-'} Min", style: AppTypography.headlineSmall.copyWith(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.primary)),
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
