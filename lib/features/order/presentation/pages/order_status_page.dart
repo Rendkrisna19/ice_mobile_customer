@@ -86,48 +86,64 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     });
   }
 
-  Future<void> _simulateSandboxPayment() async {
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Text("Simulasi Payment Gateway"),
-          content: const Text("Memproses pembayaran... (Sandbox)"),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                setState(() => _isLoading = true);
-                try {
-                  await _orderService.simulatePayment(widget.orderId);
-                  await _fetchOrderDetail(); // Refresh data
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Pembayaran Berhasil Disimulasikan!"), backgroundColor: Colors.green),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Gagal simulasi: $e"), backgroundColor: Colors.red),
-                    );
-                  }
-                } finally {
-                  if (mounted) setState(() => _isLoading = false);
-                }
-              },
-              child: const Text("Bayar Lunas"),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("Batal", style: TextStyle(color: Colors.grey)),
-            ),
-          ],
-        ),
+  Future<void> _openMidtransPayment() async {
+    final snapToken = _orderData?['snap_token'];
+    if (snapToken == null || snapToken.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Token pembayaran tidak ditemukan. Pastikan setting Midtrans sudah benar.")),
       );
+      return;
+    }
+
+    try {
+      // Buka halaman Midtrans Sandbox di Browser External
+      final url = Uri.parse("https://app.sandbox.midtrans.com/snap/v2/vtweb/$snapToken");
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+
+      // Setelah membuka browser, tampilkan dialog konfirmasi di aplikasi
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Konfirmasi Pembayaran"),
+            content: const Text("Apakah Anda sudah menyelesaikan simulasi pembayaran di halaman Midtrans?"),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  setState(() => _isLoading = true);
+                  try {
+                    // Karena tidak ada Webhook, kita gunakan API simulasi untuk mengupdate status
+                    await _orderService.simulatePayment(widget.orderId);
+                    await _fetchOrderDetail(); // Refresh data
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Pembayaran Berhasil Diverifikasi!"), backgroundColor: Colors.green),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Gagal verifikasi: $e"), backgroundColor: Colors.red),
+                      );
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isLoading = false);
+                  }
+                },
+                child: const Text("Ya, Sudah Bayar", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Belum", style: TextStyle(color: Colors.grey)),
+              ),
+            ],
+          ),
+        );
+      }
     } catch (e) {
-      debugPrint("Gagal simulate: $e");
+      debugPrint("Gagal buka Midtrans: $e");
     }
   }
 
@@ -375,8 +391,8 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              onPressed: () => _simulateSandboxPayment(),
-                              child: const Text("Simulasi Pembayaran (Sandbox)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              onPressed: () => _openMidtransPayment(),
+                              child: const Text("Buka Pembayaran Midtrans", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
                           )
                         ]

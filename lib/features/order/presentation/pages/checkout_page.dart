@@ -6,6 +6,7 @@ import '../../../../core/style/app_typography.dart';
 import '../../../../core/components/app_button.dart';
 import '../../data/datasources/order_remote_datasource.dart';
 import './checkout_waiting_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CheckoutPage extends StatefulWidget {
   final int outletId;
@@ -197,20 +198,41 @@ class _CheckoutPageState extends State<CheckoutPage> {
       if (!mounted) return;
 
       if (_paymentMethod == 'online') {
-        // Tampilkan dialog simulasi Midtrans Sandbox
+        // Dapatkan Snap Token
+        final snapToken = orderResponse['snap_token'];
+        if (snapToken != null && snapToken.isNotEmpty) {
+          try {
+            final url = Uri.parse("https://app.sandbox.midtrans.com/snap/v2/vtweb/$snapToken");
+            await launchUrl(url, mode: LaunchMode.externalApplication);
+          } catch (e) {
+            debugPrint("Gagal buka Midtrans URL: $e");
+          }
+        }
+
+        // Tampilkan dialog verifikasi pembayaran
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            title: const Text("Simulasi Payment Gateway (Sandbox)"),
-            content: Text("Berhasil mendapatkan Snap Token: \n\n${orderResponse['snap_token']}\n\nKlik 'Bayar Lunas' untuk mensimulasikan pembayaran berhasil dari Midtrans."),
+            title: const Text("Konfirmasi Pembayaran"),
+            content: const Text("Apakah Anda sudah menyelesaikan pembayaran di halaman Midtrans?"),
             actions: [
               TextButton(
                 onPressed: () {
                   Navigator.pop(ctx);
                   setState(() => _isLoading = false);
+                  // Jika belum bayar, diarahkan ke OrderStatusPage (tapi status unpaid)
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CheckoutWaitingPage(
+                        orderId: newOrderId,
+                        totalBill: _grandTotal.toDouble(),
+                      ),
+                    ),
+                  );
                 },
-                child: const Text("Batal"),
+                child: const Text("Belum", style: TextStyle(color: Colors.grey)),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
@@ -220,6 +242,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   try {
                     await _orderService.simulatePayment(newOrderId);
                     if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Pembayaran Berhasil Diverifikasi!"), backgroundColor: Colors.green),
+                      );
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
@@ -233,13 +258,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   } catch (e) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Gagal simulasi: $e")),
+                        SnackBar(content: Text("Gagal verifikasi: $e")),
                       );
                     }
                     setState(() => _isLoading = false);
                   }
                 },
-                child: const Text("Bayar Lunas"),
+                child: const Text("Ya, Sudah Bayar"),
               )
             ],
           ),
